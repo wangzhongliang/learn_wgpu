@@ -89,9 +89,10 @@ pub async fn load_model(
 
     let mut materials = Vec::new();
     for m in obj_materials? {
+        // println!("material {}", &m.diffuse_texture);
         let diffuse_texture = load_texture(&m.diffuse_texture, device, queue).await?;
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor { 
-            label: None, 
+            label: Some(&m.name), 
             layout, 
             entries: &[
                 wgpu::BindGroupEntry {
@@ -113,6 +114,8 @@ pub async fn load_model(
     }
 
     let meshes = models.into_iter().map(|m| {
+        // println!("model.name = \'{}\'", m.name);
+        // println!("model.mesh.material_id = {:?}", m.mesh.material_id);
         let vertices = (0..m.mesh.positions.len() / 3).map(|i| model::ModelVertex {
             position: [
                 m.mesh.positions[i*3],
@@ -128,18 +131,18 @@ pub async fn load_model(
         }).collect::<Vec<_>>();
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("{:?} Vertex Buffer", file_name)),
+            label: Some(&format!("{:?} Vertex Buffer", m.name)),
             contents: bytemuck::cast_slice(&vertices),
             usage: wgpu::BufferUsages::VERTEX
         });
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("{:?} Index Buffer", file_name)),
+            label: Some(&format!("{:?} Index Buffer", m.name)),
             contents: bytemuck::cast_slice(&m.mesh.indices),
             usage: wgpu::BufferUsages::INDEX
         });
 
         model::Mesh {
-            name: file_name.to_string(),
+            name: m.name,
             vertex_buffer,
             index_buffer,
             num_elements: m.mesh.indices.len() as u32,

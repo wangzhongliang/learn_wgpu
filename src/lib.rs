@@ -7,8 +7,6 @@ mod instance;
 mod resources;
 mod model;
 
-use std::ops::Mul;
-
 use camera::{Camera, CameraUniform};
 use camera_controller::CameraController;
 use instance::Instance;
@@ -18,7 +16,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
-use wgpu::util::{DeviceExt, BufferInitDescriptor};
+use wgpu::util::DeviceExt;
 use vertex::Vertex;
 use cgmath::prelude::*;
 
