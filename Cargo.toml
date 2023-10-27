@@ -18,6 +18,8 @@ cgmath = "0.18"
 tobj = { version = "3.2.1", features = [
     "async"
 ]}
+getrandom = { version = "0.2", features = ["js"] }
+instant = "0.1"
 
 [dependencies.image]
 version = "0.24"
@@ -36,6 +38,7 @@ web-sys = { version = "0.3.64", features = [
     "Location"
 ]}
 reqwest = { version = "0.11" }
+wgpu = { version="0.17", features= ["webgl"]}
 
 [lib]
 crate-type = ["cdylib", "rlib"]
