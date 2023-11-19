@@ -8,7 +8,8 @@ var<uniform> camera: Camera;
 
 struct Light {
     position: vec3f,
-    color: vec3f,
+    intensity: f32,
+    color: vec3f
 };
 @group(2) @binding(0)
 var<uniform> light: Light;
@@ -101,10 +102,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let half_dir = normalize(view_dir + light_dir);
     
     let diffuse_strength = max(dot(tangent_normal, light_dir), 0.0);
-    let diffuse_color = light.color * diffuse_strength;
+    let diffuse_color = light.color * diffuse_strength * light.intensity;
 
     let specular_strength = pow(max(dot(tangent_normal, half_dir), 0.0), 32.0);
-    let specular_color = specular_strength * light.color;
+    let specular_color = specular_strength * light.color * light.intensity;
 
     let result = (ambient_color + diffuse_color + specular_color) * object_color.rgb;
     return vec4f(result, object_color.a);

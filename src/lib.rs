@@ -24,7 +24,7 @@ use wgpu::util::DeviceExt;
 use vertex::Vertex;
 use cgmath::prelude::*;
 
-use crate::{instance::InstanceRaw, texture::Texture, model::ModelVertex, light::LightUniform};
+use crate::{instance::InstanceRaw, texture::Texture, model::{ModelVertex, Mesh}, light::PointLightUniform};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -70,10 +70,11 @@ struct State {
     instance_buffer: wgpu::Buffer,
     depth_texture: texture::Texture,
     obj_model: Model,
-    light_uniform: LightUniform,
+    light_uniform: PointLightUniform,
     light_buffer: wgpu::Buffer,
     light_bind_group: wgpu::BindGroup,
-    light_render_pipeline: wgpu::RenderPipeline
+    light_render_pipeline: wgpu::RenderPipeline,
+    light_mesh: Mesh
 }
 
 impl State {
@@ -225,7 +226,7 @@ impl State {
         );
 
         // Light
-        let light_uniform = LightUniform::new([2.0, 2.0, 2.0], [1.0, 1.0, 1.0]);
+        let light_uniform = PointLightUniform::new([2.0, 2.0, 2.0], [1.0, 1.0, 1.0], 0.2);
         let light_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Light VB"),
@@ -322,7 +323,7 @@ impl State {
             });
             let shader = wgpu::ShaderModuleDescriptor {
                 label: Some("Light Shader"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("light.wgsl").into())
+                source: wgpu::ShaderSource::Wgsl(include_str!("light/light.wgsl").into())
             };
             create_render_pipeline(
                 &device, 
@@ -357,6 +358,49 @@ impl State {
         // load obj
         let obj_model = resources::load_model("cube.obj", &device, &queue, &texture_bind_group_layout).await.unwrap();
 
+        // light mesh
+        let light_vertices: &[ModelVertex] = &[
+            ModelVertex { position: [-0.5, -0.5, -0.5], ..Default::default() },
+            ModelVertex { position: [0.5, -0.5, -0.5], ..Default::default() },             
+            ModelVertex { position: [0.5, 0.5, -0.5], ..Default::default() },           
+            ModelVertex { position: [-0.5, 0.5, -0.5], ..Default::default() },             
+            ModelVertex { position: [-0.5, -0.5, 0.5], ..Default::default() },
+            ModelVertex { position: [0.5, -0.5, 0.5], ..Default::default() },             
+            ModelVertex { position: [0.5, 0.5, 0.5], ..Default::default() },          
+            ModelVertex { position: [-0.5, 0.5, 0.5], ..Default::default() },             
+        ];
+        // 索引数据
+        let light_indices: &[u16] = &[
+            0, 1, 2,   // 三角面1
+            2, 3, 0,   // 三角面2
+            4, 5, 6,   // 三角面3
+            6, 7, 4,   // 三角面4
+            1, 0, 4,   // 三角面5
+            4, 5, 1,   // 三角面6
+            2, 1, 5,   // 三角面7
+            5, 6, 2,   // 三角面8
+            3, 2, 6,   // 三角面9
+            6, 7, 3,   // 三角面10
+            0, 3, 7,   // 三角面11
+            7, 4, 0,   // 三角面12
+        ];
+        let light_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("default_light_vertex"),
+            contents: bytemuck::cast_slice(light_vertices),
+            usage: wgpu::BufferUsages::VERTEX
+        });
+        let light_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("default_light_indices"),
+            contents: bytemuck::cast_slice(light_indices),
+            usage: wgpu::BufferUsages::INDEX
+        });
+        let light_mesh = Mesh {
+            name: "light_mesh".to_owned(),
+            vertex_buffer: light_vertex_buffer,
+            index_buffer: light_index_buffer,
+            num_elements: (light_indices.len()/3) as u32,
+            material: 0
+        };
         Self {
             surface,
             device,
@@ -384,6 +428,7 @@ impl State {
             light_buffer,
             light_bind_group,
             light_render_pipeline,
+            light_mesh,
             mouse_pressed: false,
         }
     }
@@ -480,8 +525,8 @@ impl State {
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
 
             render_pass.set_pipeline(&self.light_render_pipeline);
-            render_pass.draw_light_model(
-                &self.obj_model, 
+            render_pass.draw_light_mesh(
+                &self.light_mesh, 
                 &self.camera_bind_group, 
                 &self.light_bind_group
             );

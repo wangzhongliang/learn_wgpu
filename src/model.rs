@@ -11,6 +11,11 @@ pub struct ModelVertex {
     pub tangent: [f32; 3],
     pub bitangent: [f32; 3],
 }
+impl Default for ModelVertex {
+    fn default() -> Self {
+        ModelVertex { position: [0.0; 3], tex_coords: [0.0; 2], normal: [0.0; 3], tangent: [0.0; 3], bitangent: [0.0; 3] }
+    }
+}
 impl Vertex for ModelVertex{
     // const ATTRIBS: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![0=>Float32x3, 1=>Float32x2];
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
