@@ -13,7 +13,7 @@ pub struct ModelVertex {
 }
 impl Default for ModelVertex {
     fn default() -> Self {
-        ModelVertex { position: [0.0; 3], tex_coords: [0.0; 2], normal: [0.0; 3], tangent: [0.0; 3], bitangent: [0.0; 3] }
+        ModelVertex { position: [0.0; 3], tex_coords: [0.0; 2], normal: [1.0; 3], tangent: [1.0; 3], bitangent: [1.0; 3] }
     }
 }
 impl Vertex for ModelVertex{

@@ -8,8 +8,6 @@ mod resources;
 mod model;
 mod light;
 
-use std::f32::consts;
-
 use camera::{Camera, CameraUniform, Projection};
 use camera_controller::CameraController;
 use instance::Instance;
@@ -226,7 +224,7 @@ impl State {
         );
 
         // Light
-        let light_uniform = PointLightUniform::new([2.0, 2.0, 2.0], [1.0, 1.0, 1.0], 0.2);
+        let light_uniform = PointLightUniform::new([2.0, 2.0, 2.0], [1.0, 1.0, 1.0], 1.0);
         let light_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Light VB"),
@@ -367,7 +365,12 @@ impl State {
             ModelVertex { position: [-0.5, -0.5, 0.5], ..Default::default() },
             ModelVertex { position: [0.5, -0.5, 0.5], ..Default::default() },             
             ModelVertex { position: [0.5, 0.5, 0.5], ..Default::default() },          
-            ModelVertex { position: [-0.5, 0.5, 0.5], ..Default::default() },             
+            ModelVertex { position: [-0.5, 0.5, 0.5], ..Default::default() },
+
+            // ModelVertex { position: [-0.5, -0.5, 0.0], tex_coords: [0.0, 0.0], normal: [0., 0., 1.], tangent: [1.0, 0., 0.], bitangent: [0., 1., 0.] },
+            // ModelVertex { position: [0.5, -0.5, 0.0], tex_coords: [1.0, 0.0], normal: [0., 0., 1.], tangent: [1.0, 0., 0.], bitangent: [0., 1., 0.] },             
+            // ModelVertex { position: [0.5, 0.5, 0.0], tex_coords: [1., 1.], normal: [0., 0., 1.], tangent: [1.0, 0., 0.], bitangent: [0., 1., 0.] },          
+            // ModelVertex { position: [-0.5, 0.5, 0.0], ..Default::default() },             
         ];
         // 索引数据
         let light_indices: &[u16] = &[
@@ -394,11 +397,12 @@ impl State {
             contents: bytemuck::cast_slice(light_indices),
             usage: wgpu::BufferUsages::INDEX
         });
+        println!("index length {}",light_indices.len());
         let light_mesh = Mesh {
             name: "light_mesh".to_owned(),
             vertex_buffer: light_vertex_buffer,
             index_buffer: light_index_buffer,
-            num_elements: (light_indices.len()/3) as u32,
+            num_elements: light_indices.len() as u32,
             material: 0
         };
         Self {
@@ -530,6 +534,11 @@ impl State {
                 &self.camera_bind_group, 
                 &self.light_bind_group
             );
+            // render_pass.draw_light_model(
+            //     &self.obj_model, 
+            //     &self.camera_bind_group, 
+            //     &self.light_bind_group
+            // );
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.draw_model_instanced(
                 &self.obj_model, 
