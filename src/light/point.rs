@@ -6,8 +6,17 @@ pub struct PointLightUniform {
     pub position: [f32; 3],
     intensity: f32,
     color: [f32; 3],
+    constant: f32,
+    linear: f32,
+    quadratic: f32,
     // padding for 16 bytes align
-    _padding: u32
+    _padding1: u32,
+    _padding2: u32
+}
+impl Default for PointLightUniform {
+    fn default() -> Self {
+        Self { position: Default::default(), intensity: Default::default(), color: Default::default(), constant: 1.0, linear: 0.09, quadratic: 0.032, _padding1: 0, _padding2: 0 }
+    }
 }
 
 impl PointLightUniform {
@@ -16,7 +25,7 @@ impl PointLightUniform {
             position,
             intensity,
             color,
-            _padding: 0,
+            ..Default::default()
         }
     }
 }

@@ -6,13 +6,16 @@ struct Camera{
 @group(1) @binding(0)
 var<uniform> camera: Camera;
 
-struct Light {
+struct PointLight {
     position: vec3f,
     intensity: f32,
-    color: vec3f
+    color: vec3f,
+    constant: f32,
+    linear: f32,
+    quadratic: f32
 };
 @group(2) @binding(0)
-var<uniform> light: Light;
+var<uniform> light: PointLight;
 
 struct VertexInput {
     @location(0) position: vec3f,
@@ -93,19 +96,23 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let uv = vec2f(in.tex_coords.x, 1. - in.tex_coords.y);
     let object_color = textureSample(t_diffuse, s_diffuse, uv);
     let object_normal = textureSample(t_normal, s_normal, uv);
-    let ambient_strength = 0.1;
-    let ambient_color = light.color * ambient_strength;
-
+    
     let tangent_normal = object_normal.xyz * 2.0 - 1.0;
-    let light_dir = normalize(in.tangent_light_position - in.tangent_position);
+    let light_dir_without_normalized = in.tangent_light_position - in.tangent_position;
+    let light_dir = normalize(light_dir_without_normalized);
     let view_dir = normalize(in.tangent_view_position - in.tangent_position);
     let half_dir = normalize(view_dir + light_dir);
+    let distance = length(light_dir_without_normalized);
+    let attenuation = 1.0 / (light.constant+light.linear*distance+light.quadratic*(distance*distance));
     
-    let diffuse_strength = max(dot(tangent_normal, light_dir), 0.0);
+    let diffuse_strength = max(dot(tangent_normal, light_dir), 0.0) * attenuation;
     let diffuse_color = light.color * diffuse_strength * light.intensity;
 
-    let specular_strength = pow(max(dot(tangent_normal, half_dir), 0.0), 32.0);
+    let specular_strength = pow(max(dot(tangent_normal, half_dir), 0.0), 32.0) * attenuation;
     let specular_color = specular_strength * light.color * light.intensity;
+
+    let ambient_strength = 0.1 * attenuation;
+    let ambient_color = light.color * ambient_strength;
 
     let result = (ambient_color + diffuse_color + specular_color) * object_color.rgb;
     return vec4f(result, object_color.a);

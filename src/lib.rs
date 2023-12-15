@@ -22,7 +22,7 @@ use wgpu::util::DeviceExt;
 use vertex::Vertex;
 use cgmath::prelude::*;
 
-use crate::{instance::InstanceRaw, texture::Texture, model::{ModelVertex, Mesh}, light::PointLightUniform};
+use crate::{instance::InstanceRaw, texture::Texture, model::{ModelVertex, Mesh}, light::{PointLightUniform, DirectionalLightUniform}};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -68,11 +68,11 @@ struct State {
     instance_buffer: wgpu::Buffer,
     depth_texture: texture::Texture,
     obj_model: Model,
-    light_uniform: PointLightUniform,
+    light_uniform: DirectionalLightUniform,
     light_buffer: wgpu::Buffer,
     light_bind_group: wgpu::BindGroup,
-    light_render_pipeline: wgpu::RenderPipeline,
-    light_mesh: Mesh
+    // light_render_pipeline: wgpu::RenderPipeline,
+    // light_mesh: Mesh
 }
 
 impl State {
@@ -224,7 +224,8 @@ impl State {
         );
 
         // Light
-        let light_uniform = PointLightUniform::new([2.0, 2.0, 2.0], [1.0, 1.0, 1.0], 1.0);
+        let light_uniform = DirectionalLightUniform::new([1.0, 1.0, -1.0], [1.0, 1.0, 1.0], 1.0);
+        // let light_uniform = PointLightUniform::new([2.0, 2.0, 2.0], [1.0, 1.0, 1.0], 1.0);
         let light_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Light VB"),
@@ -291,7 +292,7 @@ impl State {
         let render_pipeline = {
             let shader = wgpu::ShaderModuleDescriptor {
                 label: Some("Shader"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into())
+                source: wgpu::ShaderSource::Wgsl(include_str!("shaders/directionallight_shader.wgsl").into())
             };
             let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
@@ -313,25 +314,25 @@ impl State {
         };
 
         // Light Render 
-        let light_render_pipeline = {
-            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
-                label: Some("Light Pipeline Layout"), 
-                bind_group_layouts: &[&camera_bind_group_layout, &light_bind_group_layout],
-                push_constant_ranges: &[] 
-            });
-            let shader = wgpu::ShaderModuleDescriptor {
-                label: Some("Light Shader"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("light/light.wgsl").into())
-            };
-            create_render_pipeline(
-                &device, 
-                &layout, 
-                config.format, 
-                Some(Texture::DEPTH_FORMAT), 
-                &[ModelVertex::desc()], 
-                shader
-            )
-        };
+        // let light_render_pipeline = {
+        //     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
+        //         label: Some("Light Pipeline Layout"), 
+        //         bind_group_layouts: &[&camera_bind_group_layout, &light_bind_group_layout],
+        //         push_constant_ranges: &[] 
+        //     });
+        //     let shader = wgpu::ShaderModuleDescriptor {
+        //         label: Some("Light Shader"),
+        //         source: wgpu::ShaderSource::Wgsl(include_str!("light/light.wgsl").into())
+        //     };
+        //     create_render_pipeline(
+        //         &device, 
+        //         &layout, 
+        //         config.format, 
+        //         Some(Texture::DEPTH_FORMAT), 
+        //         &[ModelVertex::desc()], 
+        //         shader
+        //     )
+        // };
 
         // Clear Color
         let clear_color = wgpu::Color::BLACK;
@@ -431,8 +432,8 @@ impl State {
             light_uniform,
             light_buffer,
             light_bind_group,
-            light_render_pipeline,
-            light_mesh,
+            // light_render_pipeline,
+            // light_mesh,
             mouse_pressed: false,
         }
     }
@@ -480,11 +481,16 @@ impl State {
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
         // update instances rotation
         // self.update_instances();
-        self.update_light(dt);
+        self.update_directional_light(dt);
     }
-    fn update_light(&mut self, dt: instant::Duration){
-        let old_position = cgmath::Vector3::from(self.light_uniform.position);
-        self.light_uniform.position = (cgmath::Quaternion::from_angle_y(cgmath::Deg(60.0 * dt.as_secs_f32())).rotate_vector(old_position)).into();
+    // fn update_point_light(&mut self, dt: instant::Duration){
+    //     let old_position = cgmath::Vector3::from(self.light_uniform.position);
+    //     self.light_uniform.position = (cgmath::Quaternion::from_angle_y(cgmath::Deg(60.0 * dt.as_secs_f32())).rotate_vector(old_position)).into();
+    //     self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
+    // }
+    fn update_directional_light(&mut self, dt: instant::Duration){
+        let old_direction = cgmath::Vector3::from(self.light_uniform.direction);
+        self.light_uniform.direction = (cgmath::Quaternion::from_angle_y(cgmath::Deg(60.0 * dt.as_secs_f32())).rotate_vector(old_direction)).into();
         self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
     }
     fn update_instances(&mut self){
@@ -528,17 +534,13 @@ impl State {
             });
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
 
-            render_pass.set_pipeline(&self.light_render_pipeline);
-            render_pass.draw_light_mesh(
-                &self.light_mesh, 
-                &self.camera_bind_group, 
-                &self.light_bind_group
-            );
-            // render_pass.draw_light_model(
-            //     &self.obj_model, 
+            // render_pass.set_pipeline(&self.light_render_pipeline);
+            // render_pass.draw_light_mesh(
+            //     &self.light_mesh, 
             //     &self.camera_bind_group, 
             //     &self.light_bind_group
             // );
+
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.draw_model_instanced(
                 &self.obj_model, 
