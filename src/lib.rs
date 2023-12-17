@@ -224,7 +224,7 @@ impl State {
         );
 
         // Light
-        let light_uniform = SpotLightUniform::new([1.0, 1.0, 1.0], [-1.0, -1.0, -1.0], [1.0, 1.0, 1.0], 1.0, cgmath::Deg(12.5).cos());
+        let light_uniform = SpotLightUniform::new([0.0, 10.0, 0.0], [-0.5, -0.5, 0.0], [1.0, 1.0, 1.0], 1.0, cgmath::Deg(12.5).cos(), cgmath::Deg(7.5).cos());
         // let light_uniform = DirectionalLightUniform::new([1.0, 1.0, -1.0], [1.0, 1.0, 1.0], 1.0);
         // let light_uniform = PointLightUniform::new([2.0, 2.0, 2.0], [1.0, 1.0, 1.0], 1.0);
         let light_buffer = device.create_buffer_init(

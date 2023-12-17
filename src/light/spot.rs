@@ -9,8 +9,7 @@ pub struct SpotLightUniform {
     pub direction: [f32; 3],
     intensity: f32,
     color: [f32; 3],
-    // padding for 16 bytes align
-    _padding: u32,
+    outer_cut_off: f32,
 }
 impl Default for SpotLightUniform {
     fn default() -> Self {
@@ -20,19 +19,20 @@ impl Default for SpotLightUniform {
             direction: Default::default(), 
             intensity: Default::default(), 
             color: Default::default(), 
-            _padding: 0 
+            outer_cut_off: cgmath::Deg(7.5).cos(),
         }
     }
 }
 
 impl SpotLightUniform {
-    pub fn new(position: [f32; 3], direction: [f32; 3], color: [f32; 3], intensity: f32, cut_off: f32) -> SpotLightUniform {
+    pub fn new(position: [f32; 3], direction: [f32; 3], color: [f32; 3], intensity: f32, cut_off: f32, outer_cut_off: f32) -> SpotLightUniform {
         SpotLightUniform {
             position,
             cut_off,
             direction,
             intensity,
             color,
+            outer_cut_off,
             ..Default::default()
         }
     }

@@ -11,7 +11,8 @@ struct SpotLight {
     cut_off: f32,
     direction: vec3f,
     intensity: f32,
-    color: vec3f
+    color: vec3f,
+    outer_cut_off: f32
 };
 @group(2) @binding(0)
 var<uniform> light: SpotLight;
@@ -107,10 +108,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let ambient_color = light.color * ambient_strength;
     
     let theta = dot(light_dir, normalize(-in.tangent_light_direction));
+    let epsilon = light.cut_off - light.outer_cut_off;
+    let intensity = 1.0-clamp((theta - light.outer_cut_off)/epsilon, 0.0, 1.0);
 
     if(theta > light.cut_off){
-        let diffuse_strength = max(dot(tangent_normal, light_dir), 0.0);
-        let specular_strength = pow(max(dot(tangent_normal, half_dir), 0.0), 32.0);
+        let diffuse_strength = max(dot(tangent_normal, light_dir), 0.0)*intensity;
+        let specular_strength = pow(max(dot(tangent_normal, half_dir), 0.0), 32.0)*intensity;
         let diffuse_color = light.color * diffuse_strength * light.intensity;
         let specular_color = specular_strength * light.color * light.intensity;
 
