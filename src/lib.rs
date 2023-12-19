@@ -68,11 +68,17 @@ struct State {
     instance_buffer: wgpu::Buffer,
     depth_texture: texture::Texture,
     obj_model: Model,
-    light_uniform: SpotLightUniform,
+    light_uniform: PointLightUniform,
     light_buffer: wgpu::Buffer,
     light_bind_group: wgpu::BindGroup,
     // light_render_pipeline: wgpu::RenderPipeline,
     // light_mesh: Mesh
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct LightData {
+    point_lights: [PointLightUniform; 2], // Assuming 1 point lights for simplicity
 }
 
 impl State {
@@ -224,13 +230,21 @@ impl State {
         );
 
         // Light
-        let light_uniform = SpotLightUniform::new([0.0, 10.0, 0.0], [-0.5, -0.5, 0.0], [1.0, 1.0, 1.0], 1.0, cgmath::Deg(12.5).cos(), cgmath::Deg(7.5).cos());
+        let light_uniform = PointLightUniform::new([2.0, 2.0, 2.0], [1.0, 1.0, 1.0], 0.5);
+        let light_uniform2 = PointLightUniform::new([-2.0, -2.0, 2.0], [1.0, 0.0, 0.0], 0.5);
+        let point_lights = [
+            light_uniform,
+            light_uniform2
+        ];
+        let light_data = LightData {
+            point_lights
+        };
+        // let light_uniform = SpotLightUniform::new([0.0, 10.0, 0.0], [-0.5, -0.5, 0.0], [1.0, 1.0, 1.0], 1.0, cgmath::Deg(12.5).cos(), cgmath::Deg(7.5).cos());
         // let light_uniform = DirectionalLightUniform::new([1.0, 1.0, -1.0], [1.0, 1.0, 1.0], 1.0);
-        // let light_uniform = PointLightUniform::new([2.0, 2.0, 2.0], [1.0, 1.0, 1.0], 1.0);
         let light_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Light VB"),
-                contents: bytemuck::cast_slice(&[light_uniform]),
+                contents: bytemuck::cast_slice(&[light_data]),
                 // use copy_dst to update light position
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST
             }
@@ -293,7 +307,7 @@ impl State {
         let render_pipeline = {
             let shader = wgpu::ShaderModuleDescriptor {
                 label: Some("Shader"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("shaders/spotlight_shader.wgsl").into())
+                source: wgpu::ShaderSource::Wgsl(include_str!("shaders/multiple_light_shader.wgsl").into())
             };
             let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
@@ -482,23 +496,23 @@ impl State {
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
         // update instances rotation
         // self.update_instances();
-        self.update_spot_light(dt);
+        self.update_point_light(dt);
     }
-    // fn update_point_light(&mut self, dt: instant::Duration){
-    //     let old_position = cgmath::Vector3::from(self.light_uniform.position);
-    //     self.light_uniform.position = (cgmath::Quaternion::from_angle_y(cgmath::Deg(60.0 * dt.as_secs_f32())).rotate_vector(old_position)).into();
-    //     self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
-    // }
+    fn update_point_light(&mut self, dt: instant::Duration){
+        let old_position = cgmath::Vector3::from(self.light_uniform.position);
+        self.light_uniform.position = (cgmath::Quaternion::from_angle_y(cgmath::Deg(60.0 * dt.as_secs_f32())).rotate_vector(old_position)).into();
+        self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
+    }
     // fn update_directional_light(&mut self, dt: instant::Duration){
     //     let old_direction = cgmath::Vector3::from(self.light_uniform.direction);
     //     self.light_uniform.direction = (cgmath::Quaternion::from_angle_y(cgmath::Deg(60.0 * dt.as_secs_f32())).rotate_vector(old_direction)).into();
     //     self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
     // }
-    fn update_spot_light(&mut self, dt: instant::Duration){
-        let old_direction = cgmath::Vector3::from(self.light_uniform.direction);
-        self.light_uniform.direction = (cgmath::Quaternion::from_angle_y(cgmath::Deg(60.0 * dt.as_secs_f32())).rotate_vector(old_direction)).into();
-        self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
-    }
+    // fn update_spot_light(&mut self, dt: instant::Duration){
+    //     let old_direction = cgmath::Vector3::from(self.light_uniform.direction);
+    //     self.light_uniform.direction = (cgmath::Quaternion::from_angle_y(cgmath::Deg(60.0 * dt.as_secs_f32())).rotate_vector(old_direction)).into();
+    //     self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
+    // }
     fn update_instances(&mut self){
         self.instances.iter_mut().for_each(|i| {
             let rad = cgmath::Rad(ROTATION_SPEED);
