@@ -63,29 +63,11 @@ fn vs_main(
         instance.model_matrix_3,
     );
 
-    // let normal_matrix = mat3x3f(
-    //     instance.normal_matrix_0,
-    //     instance.normal_matrix_1,
-    //     instance.normal_matrix_2,
-    // );
-    // let world_normal = normalize(normal_matrix * model.normal);
-    // let world_tangent = normalize(normal_matrix * model.tangent);
-    // let world_bitangent = normalize(normal_matrix * model.bitangent);
-    // let tangent_matrix = transpose(mat3x3f(
-    //     world_tangent,
-    //     world_bitangent,
-    //     world_normal,
-    // ));
     let world_position = model_matrix * vec4f(model.position, 1.0);
 
     var out: VertexOutput;
     out.clip_position = camera.view_proj * world_position;
     out.tex_coords = model.tex_coords;
-    // out.tangent_position = tangent_matrix * world_position.xyz;
-    // out.tangent_view_position = tangent_matrix * camera.view_pos.xyz;
-    // let light = light_data.point_lights[1];
-    // out.tangent_light_position = tangent_matrix * light.position;
-
     out.world_position = world_position.xyz;
     out.normal = model.normal;
     out.tangent = model.tangent;
@@ -110,10 +92,12 @@ var s_normal: sampler;
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     // flip Y
     let uv = vec2f(in.tex_coords.x, 1. - in.tex_coords.y);
+    // sample normal in tangent space from normal map
     let object_color = textureSample(t_diffuse, s_diffuse, uv);
     let object_normal = textureSample(t_normal, s_normal, uv);
     let tangent_normal = object_normal.xyz * 2.0 - 1.0;
 
+    // normal matrix
     let normal_matrix = mat3x3f(
         in.normal_matrix_0,
         in.normal_matrix_1,
@@ -122,19 +106,22 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let world_normal = normalize(normal_matrix * in.normal);
     let world_tangent = normalize(normal_matrix * in.tangent);
     let world_bitangent = normalize(normal_matrix * in.bitangent);
+    // tangent matrix
     let tangent_matrix = transpose(mat3x3f(
         world_tangent,
         world_bitangent,
         world_normal,
     ));
+    // convert position and viewer position to tangent space
     let tangent_position = tangent_matrix * in.world_position;
     let tangent_view_position = tangent_matrix * camera.view_pos.xyz;
-    
+    // vie direction in tangent space
     let view_dir = normalize(tangent_view_position - tangent_position);
 
     var result = vec3f(0.0);
     for(var i=0; i<2; i++){
         let light = light_data.point_lights[i];
+        // light position in tangent space
         let tangent_light_position = tangent_matrix * light.position;
         let light_dir_without_normalized = tangent_light_position - tangent_position;
         let light_dir = normalize(light_dir_without_normalized);
