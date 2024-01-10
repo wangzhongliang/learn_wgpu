@@ -31,10 +31,14 @@ struct VertexInput {
 struct VertexOutput {
     @builtin(position) clip_position: vec4f,
     @location(0) tex_coords: vec2f,
-    @location(1) tangent_position: vec3f,
-    @location(2) tangent_light_position: vec3f,
-    @location(3) tangent_view_position: vec3f
-};
+    @location(1) world_position: vec3f,
+    @location(2) normal: vec3f,
+    @location(3) tangent: vec3f,
+    @location(4) bitangent: vec3f,
+    @location(5) normal_matrix_0: vec3f,
+    @location(6) normal_matrix_1: vec3f,
+    @location(7) normal_matrix_2: vec3f,
+}
 
 struct InstanceInput {
     @location(5) model_matrix_0: vec4f,
@@ -59,28 +63,36 @@ fn vs_main(
         instance.model_matrix_3,
     );
 
-    let normal_matrix = mat3x3f(
-        instance.normal_matrix_0,
-        instance.normal_matrix_1,
-        instance.normal_matrix_2,
-    );
-    let world_normal = normalize(normal_matrix * model.normal);
-    let world_tangent = normalize(normal_matrix * model.tangent);
-    let world_bitangent = normalize(normal_matrix * model.bitangent);
-    let tangent_matrix = transpose(mat3x3f(
-        world_tangent,
-        world_bitangent,
-        world_normal,
-    ));
+    // let normal_matrix = mat3x3f(
+    //     instance.normal_matrix_0,
+    //     instance.normal_matrix_1,
+    //     instance.normal_matrix_2,
+    // );
+    // let world_normal = normalize(normal_matrix * model.normal);
+    // let world_tangent = normalize(normal_matrix * model.tangent);
+    // let world_bitangent = normalize(normal_matrix * model.bitangent);
+    // let tangent_matrix = transpose(mat3x3f(
+    //     world_tangent,
+    //     world_bitangent,
+    //     world_normal,
+    // ));
     let world_position = model_matrix * vec4f(model.position, 1.0);
 
     var out: VertexOutput;
     out.clip_position = camera.view_proj * world_position;
     out.tex_coords = model.tex_coords;
-    out.tangent_position = tangent_matrix * world_position.xyz;
-    out.tangent_view_position = tangent_matrix * camera.view_pos.xyz;
-    let light = light_data.point_lights[1];
-    out.tangent_light_position = tangent_matrix * light.position;
+    // out.tangent_position = tangent_matrix * world_position.xyz;
+    // out.tangent_view_position = tangent_matrix * camera.view_pos.xyz;
+    // let light = light_data.point_lights[1];
+    // out.tangent_light_position = tangent_matrix * light.position;
+
+    out.world_position = world_position.xyz;
+    out.normal = model.normal;
+    out.tangent = model.tangent;
+    out.bitangent = model.bitangent;
+    out.normal_matrix_0 = instance.normal_matrix_0;
+    out.normal_matrix_1 = instance.normal_matrix_1;
+    out.normal_matrix_2 = instance.normal_matrix_2;
     return out;
 }
 
@@ -100,25 +112,46 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let uv = vec2f(in.tex_coords.x, 1. - in.tex_coords.y);
     let object_color = textureSample(t_diffuse, s_diffuse, uv);
     let object_normal = textureSample(t_normal, s_normal, uv);
-    
-    let light = light_data.point_lights[1];
     let tangent_normal = object_normal.xyz * 2.0 - 1.0;
-    let light_dir_without_normalized = in.tangent_light_position - in.tangent_position;
-    let light_dir = normalize(light_dir_without_normalized);
-    let view_dir = normalize(in.tangent_view_position - in.tangent_position);
-    let half_dir = normalize(view_dir + light_dir);
-    let distance = length(light_dir_without_normalized);
-    let attenuation = 1.0 / (light.constant+light.linear*distance+light.quadratic*(distance*distance));
+
+    let normal_matrix = mat3x3f(
+        in.normal_matrix_0,
+        in.normal_matrix_1,
+        in.normal_matrix_2,
+    );
+    let world_normal = normalize(normal_matrix * in.normal);
+    let world_tangent = normalize(normal_matrix * in.tangent);
+    let world_bitangent = normalize(normal_matrix * in.bitangent);
+    let tangent_matrix = transpose(mat3x3f(
+        world_tangent,
+        world_bitangent,
+        world_normal,
+    ));
+    let tangent_position = tangent_matrix * in.world_position;
+    let tangent_view_position = tangent_matrix * camera.view_pos.xyz;
     
-    let diffuse_strength = max(dot(tangent_normal, light_dir), 0.0) * attenuation;
-    let diffuse_color = light.color * diffuse_strength * light.intensity;
+    let view_dir = normalize(tangent_view_position - tangent_position);
 
-    let specular_strength = pow(max(dot(tangent_normal, half_dir), 0.0), 32.0) * attenuation;
-    let specular_color = specular_strength * light.color * light.intensity;
+    var result = vec3f(0.0);
+    for(var i=0; i<2; i++){
+        let light = light_data.point_lights[i];
+        let tangent_light_position = tangent_matrix * light.position;
+        let light_dir_without_normalized = tangent_light_position - tangent_position;
+        let light_dir = normalize(light_dir_without_normalized);
+        let half_dir = normalize(view_dir + light_dir);
+        let distance = length(light_dir_without_normalized);
+        let attenuation = 1.0 / (light.constant+light.linear*distance+light.quadratic*(distance*distance));
+        
+        let diffuse_strength = max(dot(tangent_normal, light_dir), 0.0) * attenuation;
+        let diffuse_color = light.color * diffuse_strength * light.intensity;
 
-    let ambient_strength = 0.1 * attenuation;
-    let ambient_color = light.color * ambient_strength;
+        let specular_strength = pow(max(dot(tangent_normal, half_dir), 0.0), 32.0) * attenuation;
+        let specular_color = specular_strength * light.color * light.intensity;
 
-    let result = (ambient_color + diffuse_color + specular_color) * object_color.rgb;
+        let ambient_strength = 0.01 * attenuation;
+        let ambient_color = vec3f(1.0) * ambient_strength;
+        result += (ambient_color + diffuse_color + specular_color) * object_color.rgb;
+    }
+
     return vec4f(result, object_color.a);
 }

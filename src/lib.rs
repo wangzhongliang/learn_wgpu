@@ -68,7 +68,7 @@ struct State {
     instance_buffer: wgpu::Buffer,
     depth_texture: texture::Texture,
     obj_model: Model,
-    light_uniform: PointLightUniform,
+    light_data: LightData,
     light_buffer: wgpu::Buffer,
     light_bind_group: wgpu::BindGroup,
     // light_render_pipeline: wgpu::RenderPipeline,
@@ -230,7 +230,7 @@ impl State {
         );
 
         // Light
-        let light_uniform = PointLightUniform::new([2.0, 2.0, 2.0], [1.0, 1.0, 1.0], 0.5);
+        let light_uniform = PointLightUniform::new([2.0, 2.0, 2.0], [0.0, 1.0, 0.0], 0.8);
         let light_uniform2 = PointLightUniform::new([-2.0, -2.0, 2.0], [1.0, 0.0, 0.0], 0.5);
         let point_lights = [
             light_uniform,
@@ -444,7 +444,7 @@ impl State {
             instance_buffer,
             depth_texture,
             obj_model,
-            light_uniform,
+            light_data,
             light_buffer,
             light_bind_group,
             // light_render_pipeline,
@@ -499,9 +499,15 @@ impl State {
         self.update_point_light(dt);
     }
     fn update_point_light(&mut self, dt: instant::Duration){
-        let old_position = cgmath::Vector3::from(self.light_uniform.position);
-        self.light_uniform.position = (cgmath::Quaternion::from_angle_y(cgmath::Deg(60.0 * dt.as_secs_f32())).rotate_vector(old_position)).into();
-        self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
+        self.light_data.point_lights.iter_mut().for_each(|f| {
+            let old_position = cgmath::Vector3::from(f.position);
+            f.position = (cgmath::Quaternion::from_angle_y(cgmath::Deg(60.0 * dt.as_secs_f32())).rotate_vector(old_position)).into();
+        });
+        self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_data]));
+
+        // let old_position = cgmath::Vector3::from(self.light_uniform.position);
+        // self.light_uniform.position = (cgmath::Quaternion::from_angle_y(cgmath::Deg(60.0 * dt.as_secs_f32())).rotate_vector(old_position)).into();
+        // self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
     }
     // fn update_directional_light(&mut self, dt: instant::Duration){
     //     let old_direction = cgmath::Vector3::from(self.light_uniform.direction);
